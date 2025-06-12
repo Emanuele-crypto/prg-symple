@@ -469,6 +469,46 @@ body {
    margin-bottom: 15px;
 }
 
+/* MODAL SELEZIONE FORNITORE */
+.modal-backdrop {
+   position: fixed;
+   top: 0;
+   left: 0;
+   width: 100%;
+   height: 100%;
+   background-color: rgba(0,0,0,0.5);
+   display: none;
+   z-index: 1000;
+}
+
+.modal-content {
+   position: fixed;
+   top: 50%;
+   left: 50%;
+   transform: translate(-50%, -50%);
+   background-color: white;
+   padding: 20px;
+   border-radius: 8px;
+   border: 2px solid #000;
+   min-width: 300px;
+   z-index: 1001;
+}
+
+.modal-header {
+   margin-bottom: 15px;
+   text-align: center;
+   font-weight: bold;
+   font-size: 18px;
+}
+
+.modal-body {
+   margin-bottom: 15px;
+}
+
+.modal-footer {
+   text-align: center;
+}
+
 /* STILI STAMPA - MODIFICATO PER ORIENTAMENTO ORIZZONTALE */
 @media print {
    body { 
@@ -652,12 +692,34 @@ body {
        <!-- Le card verranno inserite qui dinamicamente con le classi card-position-X -->
    </div>
 
+   <!-- Modal selezione fornitore per destinazione -->
+   <div id="supplier-selection-modal" class="modal-backdrop">
+       <div class="modal-content">
+           <div class="modal-header">
+               Seleziona Fornitore per Destinazione
+           </div>
+           <div class="modal-body">
+               <label for="supplier-select" class="form-label">Scegli il fornitore di riferimento:</label>
+               <select id="supplier-select" class="form-select">
+                   <option value="">Seleziona fornitore</option>
+               </select>
+           </div>
+           <div class="modal-footer">
+               <button type="button" class="btn btn-success" id="confirm-supplier-selection">
+                   Conferma
+               </button>
+               <button type="button" class="btn btn-secondary" id="cancel-supplier-selection">
+                   Annulla
+               </button>
+           </div>
+       </div>
+   </div>
+
    <!-- Input file nascosto -->
    <input type="file" id="file-input" accept=".json" style="display: none;">
 
 <script>
 $(document).ready(function() {
-   let cardCount = 0;
    let fornitoriData = {};
    let destinazioniData = {};
    let transferData = {};
@@ -713,53 +775,70 @@ $(document).ready(function() {
        $('#elements-count').text(count);
    }
 
-   // Funzione per ottenere la posizione successiva (logica sopra-sotto-sopra-sotto)
-   function getNextPosition() {
-       cardCount++;
+   // NUOVA: Funzione per riorganizzare le posizioni dopo rimozione
+   function reorganizePositions() {
+       const allCards = $('#main-grid > div').toArray();
        
-       // Calcola colonna e riga in base al numero della card
-       // Card 1,2 -> colonna 1; Card 3,4 -> colonna 2; Card 5,6 -> colonna 3; Card 7,8 -> colonna 4
-       const column = Math.ceil(cardCount / 2);
-       // Card dispari -> riga 1; Card pari -> riga 2
-       const row = (cardCount % 2 === 1) ? 1 : 2;
+       // Rimuovi le classi di posizione esistenti
+       allCards.forEach(card => {
+           $(card).removeClass('card-position-1 card-position-2 card-position-3 card-position-4 card-position-5 card-position-6 card-position-7 card-position-8');
+       });
        
-       if (column > 4) {
+       // Riassegna le posizioni in ordine sequenziale
+       allCards.forEach((card, index) => {
+           $(card).addClass(`card-position-${index + 1}`);
+       });
+       
+       updateElementsCount();
+   }
+
+   // NUOVA: Funzione per ottenere la prima posizione libera
+   function getNextAvailablePosition() {
+       const existingCards = $('#main-grid > div').length;
+       if (existingCards >= 8) {
            alert('Massimo 8 elementi supportati (4 colonne x 2 righe)');
-           cardCount--;
            return null;
        }
-       
-       return cardCount;
+       return existingCards + 1;
    }
 
-   // MODIFICATO: Funzione per ottenere il numero di destinazione basato sul fornitore di riferimento
-   function getDestinationNumber() {
-       const supplierCount = $('.supplier-card').length;
-       const destinationCount = $('.destination-card').length;
-       
-       // Se non ci sono fornitori, inizia da 1
-       if (supplierCount === 0) {
-           return 1;
-       }
-       
-       // Calcola quante destinazioni dovrebbero esserci per il numero attuale di fornitori
-       // Ogni fornitore può avere destinazioni che ripartono da 1
-       const destinationsPerSupplier = Math.ceil(destinationCount / supplierCount) + 1;
-       const currentSupplierIndex = supplierCount;
-       
-       // Trova quante destinazioni esistono già per l'ultimo fornitore
-       const existingDestinationsForLastSupplier = destinationCount - ((supplierCount - 1) * destinationsPerSupplier);
-       
-       return Math.max(1, existingDestinationsForLastSupplier + 1);
+   // MODIFICATA: Funzione per generare un cardIndex univoco
+   function getNextCardIndex() {
+       let maxIndex = 0;
+       $('#main-grid > div').each(function() {
+           const cardIndex = parseInt($(this).data('card-index')) || 0;
+           if (cardIndex > maxIndex) {
+               maxIndex = cardIndex;
+           }
+       });
+       return maxIndex + 1;
    }
 
-   // MODIFICATO: Funzione per ottenere il fornitore di riferimento per una destinazione
-   function getReferenceSupplier() {
-       const supplierCount = $('.supplier-card').length;
-       return supplierCount > 0 ? supplierCount : 1;
+   // NUOVA: Funzione per aggiornare le numerazioni delle destinazioni
+   function updateDestinationHeaders() {
+       $('.destination-card').each(function() {
+           const cardIndex = $(this).data('card-index');
+           const selectedSupplier = $(this).data('selected-supplier');
+           
+           if (selectedSupplier) {
+               // Conta quante destinazioni ha già questo fornitore
+               let destCount = 0;
+               $('.destination-card').each(function() {
+                   const thisSupplier = $(this).data('selected-supplier');
+                   const thisIndex = $(this).data('card-index');
+                   if (thisSupplier === selectedSupplier && thisIndex <= cardIndex) {
+                       destCount++;
+                   }
+               });
+               
+               $(this).find('.dest-card-header').text(`${destCount}ª Destinazione F${selectedSupplier}`);
+           } else {
+               $(this).find('.dest-card-header').text('Destinazione non assegnata');
+           }
+       });
    }
 
-   // Crea card fornitore semplificata
+   // Crea card fornitore
    function createSupplierCard(cardIndex) {
        const agrume = $('#tipo-agrume').val();
        let varietyOptionsHtml = '<option value="">Seleziona varietà</option>';
@@ -771,7 +850,7 @@ $(document).ready(function() {
        }
 
        return `
-           <div class="supplier-card card-position-${cardIndex}" data-card-index="${cardIndex}" data-card-type="supplier">
+           <div class="supplier-card" data-card-index="${cardIndex}" data-card-type="supplier">
                <div class="card-header">Fornitore ${cardIndex}</div>
                
                <div class="form-row">
@@ -959,14 +1038,11 @@ $(document).ready(function() {
        `;
    }
 
-   // MODIFICATO: Crea card destinazione con riferimento al fornitore
-   function createDestinationCard(cardIndex) {
-       const destinationNumber = getDestinationNumber();
-       const referenceSupplier = getReferenceSupplier();
-
+   // Crea card destinazione
+   function createDestinationCard(cardIndex, selectedSupplier) {
        return `
-           <div class="destination-card card-position-${cardIndex}" data-card-index="${cardIndex}" data-card-type="destination">
-               <div class="dest-card-header">${destinationNumber}ª Destinazione F${referenceSupplier}</div>
+           <div class="destination-card" data-card-index="${cardIndex}" data-card-type="destination" data-selected-supplier="${selectedSupplier || ''}">
+               <div class="dest-card-header">Destinazione non assegnata</div>
                
                <!-- Provenienza -->
                <div class="provenienza-info" id="provenienza-${cardIndex}">
@@ -1104,19 +1180,53 @@ $(document).ready(function() {
        `;
    }
 
-   // NUOVO: Funzione per aggiornare le numerazioni delle destinazioni dopo l'aggiunta di un fornitore
-   function updateDestinationHeaders() {
-       $('.destination-card').each(function(index) {
-           const destinationNumber = index + 1;
-           const supplierCount = $('.supplier-card').length;
-           const referenceSupplier = supplierCount > 0 ? supplierCount : 1;
+   // NUOVA: Gestione modal selezione fornitore
+   function showSupplierSelectionModal() {
+       return new Promise((resolve, reject) => {
+           const modal = $('#supplier-selection-modal');
+           const select = $('#supplier-select');
            
-           // Determina a quale fornitore si riferisce questa destinazione
-           const destinationsPerSupplier = Math.ceil($('.destination-card').length / supplierCount) || 1;
-           const supplierIndex = Math.min(supplierCount, Math.ceil((index + 1) / destinationsPerSupplier));
-           const destNumberForSupplier = ((index) % destinationsPerSupplier) + 1;
+           // Popola lista fornitori
+           select.empty().append('<option value="">Seleziona fornitore</option>');
            
-           $(this).find('.dest-card-header').text(`${destNumberForSupplier}ª Destinazione F${supplierIndex}`);
+           $('.supplier-card').each(function() {
+               const cardIndex = $(this).data('card-index');
+               const nome = $(this).find('.nome-fornitore').val();
+               const altroNome = $(this).find('.altro-fornitore').val();
+               
+               let displayName = '';
+               if (nome === 'ALTRO' && altroNome) {
+                   displayName = altroNome;
+               } else if (nome && nome !== 'ALTRO') {
+                   displayName = nome;
+               }
+               
+               if (displayName) {
+                   select.append(`<option value="${cardIndex}">F${cardIndex} - ${displayName}</option>`);
+               }
+           });
+           
+           if (select.find('option').length === 1) {
+               reject('Nessun fornitore disponibile');
+               return;
+           }
+           
+           modal.fadeIn();
+           
+           $('#confirm-supplier-selection').off('click').on('click', function() {
+               const selectedSupplier = select.val();
+               if (!selectedSupplier) {
+                   alert('Seleziona un fornitore');
+                   return;
+               }
+               modal.fadeOut();
+               resolve(selectedSupplier);
+           });
+           
+           $('#cancel-supplier-selection').off('click').on('click', function() {
+               modal.fadeOut();
+               reject('Operazione annullata');
+           });
        });
    }
 
@@ -1224,8 +1334,7 @@ $(document).ready(function() {
            
            let orarioFine = `${oreFine.toString().padStart(2, '0')}:${minutiFine.toString().padStart(2, '0')}`;
            
-           // Gestisci giorno successivo
-           if (fineMinuti >= 1440) { // 24 ore = 1440 minuti
+           if (fineMinuti >= 1440) {
                orarioFine += ' (g.succ.)';
            }
            
@@ -1302,7 +1411,7 @@ $(document).ready(function() {
        updateTransferOptions();
    };
 
-   // Aggiorna card destinazione
+   // MODIFICATA: Aggiorna card destinazione
    window.updateDestinationCard = function(cardIndex) {
        const card = $(`.supplier-card[data-card-index="${cardIndex}"]`);
        const quantitaPrima = parseFloat(card.find('.succo-prima').val()) || 0;
@@ -1346,7 +1455,7 @@ $(document).ready(function() {
        $('#giacenza-totale').text(totaleGiacenza);
    }
 
-   // Aggiorna opzioni trasferimento
+   // MODIFICATA: Aggiorna opzioni trasferimento con destinazioni
    function updateTransferOptions() {
        $('.transfer-dest').each(function() {
            const sourceCardIndex = $(this).closest('.supplier-card').data('card-index');
@@ -1364,11 +1473,28 @@ $(document).ready(function() {
                }
            });
            
-           // Aggiungi destinazioni
+           // NUOVA: Aggiungi destinazioni con numerazione corretta
            $('.destination-card').each(function() {
                const cardIndex = $(this).data('card-index');
-               $(`.supplier-card[data-card-index="${sourceCardIndex}"] .transfer-dest`)
-                   .append(`<option value="D${cardIndex}">D${cardIndex}</option>`);
+               const selectedSupplier = $(this).data('selected-supplier');
+               
+               if (selectedSupplier) {
+                   // Conta quante destinazioni ha questo fornitore prima di questa
+                   let destNumber = 1;
+                   $('.destination-card').each(function() {
+                       const thisSupplier = $(this).data('selected-supplier');
+                       const thisIndex = $(this).data('card-index');
+                       if (thisSupplier === selectedSupplier && thisIndex < cardIndex) {
+                           destNumber++;
+                       }
+                   });
+                   
+                   $(`.supplier-card[data-card-index="${sourceCardIndex}"] .transfer-dest`)
+                       .append(`<option value="D${cardIndex}">${destNumber}ª dest.</option>`);
+               } else {
+                   $(`.supplier-card[data-card-index="${sourceCardIndex}"] .transfer-dest`)
+                       .append(`<option value="D${cardIndex}">Dest.${cardIndex}</option>`);
+               }
            });
        });
    }
@@ -1738,7 +1864,7 @@ $(document).ready(function() {
        alert(`Combinazione ${colorText} rimossa. I valori sono stati ricalcolati.`);
    }
 
-   // Reset card
+   // MODIFICATA: Reset card
    window.resetCard = function(cardIndex) {
        if (confirm('Resettare tutti i campi di questa card?')) {
            const supplierCard = $(`.supplier-card[data-card-index="${cardIndex}"]`);
@@ -1784,18 +1910,23 @@ $(document).ready(function() {
                delete provenienzaData[cardIndex];
                $(`#provenienza-${cardIndex}`).text('Nessuna provenienza');
                
+               // Reset assegnazione fornitore
+               destCard.removeData('selected-supplier');
+               destCard.find('.dest-card-header').text('Destinazione non assegnata');
+               
                updateDestBioStyles(cardIndex);
            }
            
            updateTotals();
            updateCombinazioneOptions();
            updateTransferOptions();
+           updateDestinationHeaders();
            
            alert('Card resettata con successo!');
        }
    };
 
-   // Rimuovi card
+   // MODIFICATA: Rimuovi card con riorganizzazione posizioni
    window.removeCard = function(cardIndex) {
        if (confirm('Rimuovere questa card?')) {
            // Rimuovi riferimenti dalle combinazioni
@@ -1823,13 +1954,13 @@ $(document).ready(function() {
                );
            });
            
+           // NUOVA: Riorganizza le posizioni dopo la rimozione
+           reorganizePositions();
+           
            updateTotals();
            updateCombinazioneOptions();
            toggleCombinazioniSection();
            updateTransferOptions();
-           updateElementsCount();
-           
-           // NUOVO: Aggiorna le numerazioni delle destinazioni
            updateDestinationHeaders();
        }
    };
@@ -1895,10 +2026,12 @@ $(document).ready(function() {
        // Raccolta dati destinazioni
        $('.destination-card').each(function() {
            const cardIndex = $(this).data('card-index');
+           const selectedSupplier = $(this).data('selected-supplier');
            
            const card = {
                cardIndex: cardIndex,
                cardType: 'destination',
+               selectedSupplier: selectedSupplier,
                quantitaPrima: parseFloat($(this).find('.quantita-prima-dest').val()) || 0,
                destinazione: $(this).find('.destinazione-succo').val(),
                altraDestinazioneText: $(this).find('.altra-destinazione-text').val(),
@@ -2022,22 +2155,22 @@ $(document).ready(function() {
        
        // Rimuovi card esistenti
        $('#main-grid').empty();
-       cardCount = 0;
        
        // Ripristina cards nell'ordine corretto
        if (data.cards && data.cards.length > 0) {
            // Ordina per cardIndex
            data.cards.sort((a, b) => a.cardIndex - b.cardIndex);
            
-           data.cards.forEach(cardData => {
+           data.cards.forEach((cardData, index) => {
                const cardIndex = cardData.cardIndex;
-               if (cardIndex > cardCount) cardCount = cardIndex;
+               const position = index + 1; // Posizione sequenziale
                
                if (cardData.cardType === 'supplier') {
                    const newCard = createSupplierCard(cardIndex);
                    $('#main-grid').append(newCard);
                    
                    const card = $(`.supplier-card[data-card-index="${cardIndex}"]`);
+                   card.addClass(`card-position-${position}`);
                    
                    // Ripristina tutti i dati del fornitore
                    card.find('.nome-fornitore').val(cardData.nome || '');
@@ -2096,10 +2229,16 @@ $(document).ready(function() {
                    updateSupplier(cardIndex);
                    
                } else if (cardData.cardType === 'destination') {
-                   const newCard = createDestinationCard(cardIndex);
+                   const newCard = createDestinationCard(cardIndex, cardData.selectedSupplier);
                    $('#main-grid').append(newCard);
                    
                    const card = $(`.destination-card[data-card-index="${cardIndex}"]`);
+                   card.addClass(`card-position-${position}`);
+                   
+                   // Imposta fornitore selezionato
+                   if (cardData.selectedSupplier) {
+                       card.data('selected-supplier', cardData.selectedSupplier);
+                   }
                    
                    // Ripristina dati destinazione
                    card.find('.quantita-prima-dest').val(cardData.quantitaPrima || '');
@@ -2218,30 +2357,50 @@ $(document).ready(function() {
            return;
        }
        
-       const position = getNextPosition();
+       const position = getNextAvailablePosition();
        if (position === null) return;
        
-       const newCard = createSupplierCard(position);
+       const cardIndex = getNextCardIndex();
+       const newCard = createSupplierCard(cardIndex);
        $('#main-grid').append(newCard);
        
-       // NUOVO: Aggiorna le numerazioni delle destinazioni dopo l'aggiunta del fornitore
-       updateDestinationHeaders();
+       // Aggiungi la classe di posizione
+       $(`.supplier-card[data-card-index="${cardIndex}"]`).addClass(`card-position-${position}`);
        
        updateElementsCount();
        updateCombinazioneOptions();
        toggleCombinazioniSection();
        updateTransferOptions();
+       updateDestinationHeaders();
    });
 
-   $('#aggiungi-destinazione').click(function() {
-       const position = getNextPosition();
-       if (position === null) return;
-       
-       const newCard = createDestinationCard(position);
-       $('#main-grid').append(newCard);
-       
-       updateElementsCount();
-       updateTransferOptions();
+   // MODIFICATA: Gestione aggiunta destinazione con selezione fornitore
+   $('#aggiungi-destinazione').click(async function() {
+       try {
+           const position = getNextAvailablePosition();
+           if (position === null) return;
+           
+           // Mostra modal per selezione fornitore
+           const selectedSupplier = await showSupplierSelectionModal();
+           
+           const cardIndex = getNextCardIndex();
+           const newCard = createDestinationCard(cardIndex, selectedSupplier);
+           $('#main-grid').append(newCard);
+           
+           // Aggiungi la classe di posizione
+           const card = $(`.destination-card[data-card-index="${cardIndex}"]`);
+           card.addClass(`card-position-${position}`);
+           card.data('selected-supplier', selectedSupplier);
+           
+           updateElementsCount();
+           updateTransferOptions();
+           updateDestinationHeaders();
+           
+       } catch (error) {
+           if (error !== 'Operazione annullata') {
+               alert(error);
+           }
+       }
    });
 
    // Eventi combinazioni
@@ -2436,12 +2595,6 @@ $(document).ready(function() {
        }
    });
 
-   // Miglioramento UX: conferma prima di applicare combinazioni
-   function confirmCombination(color, details) {
-       const message = `Applicare la combinazione ${color.toUpperCase()}?\n\nFornitori inclusi:\n${details.map(d => `F${d.cardIndex} - ${d.nome}: ${d.quantita}kg`).join('\n')}`;
-       return confirm(message);
-   }
-
    // Controllo validità dati prima del salvataggio
    function validateData() {
        let isValid = true;
@@ -2492,7 +2645,7 @@ $(document).ready(function() {
        }
    };
 
-   // Funzione di debug per sviluppatori (rimovere in produzione)
+   // Funzione di debug per sviluppatori
    window.debugInfo = function() {
        console.log('Fornitori Data:', fornitoriData);
        console.log('Destinazioni Data:', destinazioniData);
@@ -2500,13 +2653,6 @@ $(document).ready(function() {
        console.log('Combination Data:', combinationData);
        console.log('Provenienza Data:', provenienzaData);
    };
-
-   // Tooltip informativi (opzionale)
-   function addTooltips() {
-       $('[title]').each(function() {
-           $(this).tooltip();
-       });
-   }
 
    // Controllo responsive per mobile
    function checkMobileView() {
@@ -2519,7 +2665,6 @@ $(document).ready(function() {
    // Inizializzazione completa
    initApp();
    checkAutoSave();
-   addTooltips();
    checkMobileView();
 
    // Event listener per il ridimensionamento finestra
@@ -2527,12 +2672,12 @@ $(document).ready(function() {
        checkMobileView();
    });
 
-   console.log('Sistema Programma Giornaliero Trasformazione inizializzato - Layout 4x2 con posizionamento sopra-sotto');
+   console.log('Sistema Programma Giornaliero Trasformazione inizializzato - Layout 4x2 MODIFICATO');
    console.log('Modifiche applicate:');
-   console.log('- Stampa in orientamento orizzontale');
-   console.log('- Prima destinazione inizia con "1ª Destinazione"');
-   console.log('- Numerazione destinazioni ripartente per ogni fornitore');
-   console.log('- Sistema ripristinato e funzionante');
+   console.log('- Riorganizzazione automatica posizioni dopo rimozione card');
+   console.log('- Selezione fornitore per nuove destinazioni tramite modal');
+   console.log('- Numerazione corretta destinazioni nel menu trasferimenti');
+   console.log('- Gestione sequenziale delle posizioni nel grid');
    console.log('Tasti scorciatoia: Ctrl+S (Salva), Ctrl+O (Apri), Ctrl+P (Stampa), Ctrl+N (Nuovo Fornitore), Ctrl+M (Nuova Destinazione)');
 });
 </script>
