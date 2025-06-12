@@ -178,8 +178,8 @@ body {
    border: 2px solid #000000;
    border-radius: 8px;
    padding: 10px;
-   min-height: 450px;
-   max-height: 450px;
+   min-height: 500px;
+   max-height: 500px;
    overflow-y: auto;
 }
 
@@ -731,18 +731,15 @@ $(document).ready(function() {
        viola: { indexes: [], details: [] }
    };
    
-   // NUOVO: Variabile per tracciare il numero progressivo dei fornitori
-   let nextSupplierNumber = 1;
-   
    // Rese per linea di trasformazione
    const yieldsPerLine = {
-       'BOE/1100': 31.30,
-       'GOE EST/400': 31.60,
-       '400': 32.00,
-       'GOE EST/POLY': 30.60,
-       'GOE INT/POLY': 28.30,
-       'BIRILLATRICI': 26.60,
-       'GOE EST/BIRILLATRICI': 25.60
+       'BOE/1100': { prima: 31.30, seconda: 5.0, torchiato: 6.0 },
+       'GOE EST/400': { prima: 31.60, seconda: 0, torchiato: 6.0 },
+       '400': { prima: 32.00, seconda: 0, torchiato: 6.0 },
+       'GOE EST/POLY': { prima: 30.60, seconda: 0, torchiato: 6.0 },
+       'GOE INT/POLY': { prima: 28.30, seconda: 0, torchiato: 6.0 },
+       'BIRILLATRICI': { prima: 26.60, seconda: 0, torchiato: 6.0 },
+       'GOE EST/BIRILLATRICI': { prima: 25.60, seconda: 0, torchiato: 6.0 }
    };
 
    // Definizione varietà per ogni tipo di agrume
@@ -753,23 +750,6 @@ $(document).ready(function() {
        'BERGAMOTTO': ['FEMMINELLO', 'CASTAGNARO', 'VARIE', 'ALTRO'],
        'POMPELMO': ['GIALLO', 'ROSA', 'VARIE', 'ALTRO']
    };
-
-   // NUOVO: Funzione per ottenere il numero successivo del fornitore
-   function getNextSupplierNumber() {
-       return nextSupplierNumber++;
-   }
-
-   // NUOVO: Funzione per aggiornare il nextSupplierNumber basandosi sui fornitori esistenti
-   function updateNextSupplierNumber() {
-       let maxSupplierNumber = 0;
-       $('.supplier-card').each(function() {
-           const supplierNumber = parseInt($(this).data('supplier-number')) || 0;
-           if (supplierNumber > maxSupplierNumber) {
-               maxSupplierNumber = supplierNumber;
-           }
-       });
-       nextSupplierNumber = maxSupplierNumber + 1;
-   }
 
    // Inizializzazione
    function initApp() {
@@ -795,7 +775,7 @@ $(document).ready(function() {
        $('#elements-count').text(count);
    }
 
-   // Funzione per riorganizzare le posizioni dopo rimozione
+   // NUOVA: Funzione per riorganizzare le posizioni dopo rimozione
    function reorganizePositions() {
        const allCards = $('#main-grid > div').toArray();
        
@@ -812,7 +792,7 @@ $(document).ready(function() {
        updateElementsCount();
    }
 
-   // Funzione per ottenere la prima posizione libera
+   // NUOVA: Funzione per ottenere la prima posizione libera
    function getNextAvailablePosition() {
        const existingCards = $('#main-grid > div').length;
        if (existingCards >= 8) {
@@ -822,7 +802,19 @@ $(document).ready(function() {
        return existingCards + 1;
    }
 
-   // Funzione per generare un cardIndex univoco
+   // MODIFICATA: Funzione per ottenere il prossimo numero fornitore
+   function getNextSupplierNumber() {
+       let maxSupplierNumber = 0;
+       $('.supplier-card').each(function() {
+           const supplierNumber = parseInt($(this).data('supplier-number')) || 0;
+           if (supplierNumber > maxSupplierNumber) {
+               maxSupplierNumber = supplierNumber;
+           }
+       });
+       return maxSupplierNumber + 1;
+   }
+
+   // MODIFICATA: Funzione per generare un cardIndex univoco
    function getNextCardIndex() {
        let maxIndex = 0;
        $('#main-grid > div').each(function() {
@@ -834,7 +826,7 @@ $(document).ready(function() {
        return maxIndex + 1;
    }
 
-   // Funzione per aggiornare le numerazioni delle destinazioni
+   // NUOVA: Funzione per aggiornare le numerazioni delle destinazioni
    function updateDestinationHeaders() {
        $('.destination-card').each(function() {
            const cardIndex = $(this).data('card-index');
@@ -858,7 +850,7 @@ $(document).ready(function() {
        });
    }
 
-   // MODIFICATA: Crea card fornitore con numero fornitore specifico
+   // MODIFICATA: Crea card fornitore con succo 2ª e torchiato
    function createSupplierCard(cardIndex, supplierNumber) {
        const agrume = $('#tipo-agrume').val();
        let varietyOptionsHtml = '<option value="">Seleziona varietà</option>';
@@ -949,7 +941,7 @@ $(document).ready(function() {
                <div class="form-row">
                    <span class="form-label">Linea:</span>
                    <div class="form-input">
-                       <select class="linea" onchange="updateYield(${cardIndex}); calculateSupplier(${cardIndex}); updateBioStyle(${cardIndex})">
+                       <select class="linea" onchange="updateYield(${cardIndex}); calculateSupplier(${cardIndex}); updateBioStyle(${cardIndex}); toggleSecondaSection(${cardIndex})">
                            <option value="">Seleziona linea</option>
                            <option value="GOE EST/400">GOE EST/400</option>
                            <option value="BOE/1100">BOE/1100</option>
@@ -964,7 +956,7 @@ $(document).ready(function() {
                <div class="form-row">
                    <span class="form-label">Portata (kg/h):</span>
                    <div class="form-input">
-                       <input type="number" class="portata" min="100" max="5000" onchange="calculateTime(${cardIndex})">
+                       <input type="number" class="portata" onchange="calculateTime(${cardIndex})">
                    </div>
                </div>
 
@@ -990,6 +982,20 @@ $(document).ready(function() {
                        <input type="number" class="succo-prima yield-result" readonly>
                        <div class="transfer-details hidden-field"></div>
                        <div class="combination-details hidden-field"></div>
+                   </div>
+               </div>
+
+               <div class="form-row seconda-section hidden-field">
+                   <span class="form-label">Succo 2ª (kg):</span>
+                   <div class="form-input">
+                       <input type="number" class="succo-seconda yield-result" readonly>
+                   </div>
+               </div>
+
+               <div class="form-row">
+                   <span class="form-label">Torchiato (kg):</span>
+                   <div class="form-input">
+                       <input type="number" class="succo-torchiato yield-result" readonly>
                    </div>
                </div>
 
@@ -1200,7 +1206,7 @@ $(document).ready(function() {
        `;
    }
 
-   // Gestione modal selezione fornitore
+   // NUOVA: Gestione modal selezione fornitore
    function showSupplierSelectionModal() {
        return new Promise((resolve, reject) => {
            const modal = $('#supplier-selection-modal');
@@ -1221,7 +1227,7 @@ $(document).ready(function() {
                    displayName = nome;
                }
                
-               if (displayName && supplierNumber) {
+               if (displayName) {
                    select.append(`<option value="${supplierNumber}">F${supplierNumber} - ${displayName}</option>`);
                }
            });
@@ -1249,6 +1255,20 @@ $(document).ready(function() {
            });
        });
    }
+
+   // NUOVA: Gestione sezione succo 2ª
+   window.toggleSecondaSection = function(cardIndex) {
+       const card = $(`.supplier-card[data-card-index="${cardIndex}"]`);
+       const linea = card.find('.linea').val();
+       const secondaSections = card.find('.seconda-section');
+       
+       if (linea === 'BOE/1100') {
+           secondaSections.removeClass('hidden-field');
+       } else {
+           secondaSections.addClass('hidden-field');
+           card.find('.succo-seconda').val('');
+       }
+   };
 
    // Gestione campi "ALTRO"
    window.toggleAltroVarieta = function(cardIndex) {
@@ -1299,7 +1319,7 @@ $(document).ready(function() {
        }
    };
 
-   // Aggiorna resa in base alla linea
+   // MODIFICATA: Aggiorna resa in base alla linea con succo 2ª e torchiato
    window.updateYield = function(cardIndex) {
        const card = $(`.supplier-card[data-card-index="${cardIndex}"]`);
        const linea = card.find('.linea').val();
@@ -1310,7 +1330,7 @@ $(document).ready(function() {
        }
    };
 
-   // Calcola valori fornitore
+   // MODIFICATA: Calcola valori fornitore con succo 2ª e torchiato
    window.calculateSupplier = function(cardIndex) {
        const card = $(`.supplier-card[data-card-index="${cardIndex}"]`);
        
@@ -1320,15 +1340,37 @@ $(document).ready(function() {
        
        card.find('.giacenza').val(giacenza >= 0 ? giacenza : 0);
        
-       // Calcola succo 1ª
-       const resa = fornitoriData[cardIndex]?.resa || 30;
-       const succoField = card.find('.succo-prima');
+       // Calcola prodotti in base alla linea selezionata
+       const linea = card.find('.linea').val();
+       const rese = yieldsPerLine[linea] || { prima: 30, seconda: 0, torchiato: 6 };
        
-       if (trasformata > 0 && !succoField.hasClass('combination-result')) {
-           const succo = (trasformata * resa / 100).toFixed(1);
-           succoField.val(succo);
-       } else if (trasformata === 0 && !succoField.hasClass('combination-result')) {
-           succoField.val('');
+       const succoField = card.find('.succo-prima');
+       const succoSecondaField = card.find('.succo-seconda');
+       const succoTorchiatoField = card.find('.succo-torchiato');
+       
+       if (trasformata > 0) {
+           // Calcola succo 1ª solo se non è risultato di combinazione
+           if (!succoField.hasClass('combination-result')) {
+               const succo = (trasformata * rese.prima / 100).toFixed(1);
+               succoField.val(succo);
+           }
+           
+           // Calcola succo 2ª (solo per BOE/1100)
+           if (linea === 'BOE/1100') {
+               const succoSeconda = (trasformata * rese.seconda / 100).toFixed(1);
+               succoSecondaField.val(succoSeconda);
+           }
+           
+           // Calcola torchiato
+           const succoTorchiato = (trasformata * rese.torchiato / 100).toFixed(1);
+           succoTorchiatoField.val(succoTorchiato);
+           
+       } else {
+           if (!succoField.hasClass('combination-result')) {
+               succoField.val('');
+           }
+           succoSecondaField.val('');
+           succoTorchiatoField.val('');
        }
        
        updateTotals();
@@ -1364,7 +1406,7 @@ $(document).ready(function() {
        }
    };
 
-   // MODIFICATA: Aggiorna stili bio con numero fornitore corretto
+   // MODIFICATA: Aggiorna stili bio con numero fornitore
    window.updateBioStyle = function(cardIndex) {
        const card = $(`.supplier-card[data-card-index="${cardIndex}"]`);
        const cert = card.find('.certificazione').val();
@@ -1388,7 +1430,7 @@ $(document).ready(function() {
            card.find('.certificazione, .varieta, .linea').addClass('bio-red-field');
        }
        
-       // Aggiorna header con nome e numero fornitore
+       // Aggiorna header con nome
        if (nome) {
            card.find('.card-header').text(`F${supplierNumber} - ${nome}`);
        } else {
@@ -1432,10 +1474,20 @@ $(document).ready(function() {
        updateTransferOptions();
    };
 
-   // Aggiorna card destinazione
+   // MODIFICATA: Aggiorna card destinazione con gestione combinazioni
    window.updateDestinationCard = function(cardIndex) {
        const card = $(`.supplier-card[data-card-index="${cardIndex}"]`);
-       const quantitaPrima = parseFloat(card.find('.succo-prima').val()) || 0;
+       let quantitaPrima = parseFloat(card.find('.succo-prima').val()) || 0;
+       
+       // Se la card fa parte di una combinazione, calcola il totale della combinazione
+       if (card.find('.succo-prima').hasClass('combination-result')) {
+           const combinationType = card.find('.succo-prima').attr('data-combination-type');
+           if (combinationType && combinationData[combinationType]) {
+               quantitaPrima = combinationData[combinationType].details.reduce((sum, detail) => 
+                   sum + parseFloat(detail.risultato), 0);
+           }
+       }
+       
        const totalTransferred = transferredAmounts[cardIndex] || 0;
        const available = quantitaPrima - totalTransferred;
        
@@ -1476,26 +1528,38 @@ $(document).ready(function() {
        $('#giacenza-totale').text(totaleGiacenza);
    }
 
-   // MODIFICATA: Aggiorna opzioni trasferimento con numero fornitore e destinazioni specifiche
+   // MODIFICATA: Aggiorna opzioni trasferimento con numero fornitore
    function updateTransferOptions() {
        $('.transfer-dest').each(function() {
            const sourceCardIndex = $(this).closest('.supplier-card').data('card-index');
            $(this).empty().append('<option value="">Dest.</option>');
            
-           // Aggiungi fornitori (escluso il fornitore corrente) con numero fornitore
+           // Aggiungi fornitori (escluso il fornitore corrente)
            $('.supplier-card').each(function() {
                const cardIndex = $(this).data('card-index');
                const supplierNumber = $(this).data('supplier-number');
                if (cardIndex !== sourceCardIndex) {
                    const nome = $(this).find('.nome-fornitore').val();
-                   if (nome && supplierNumber) {
+                   const altroNome = $(this).find('.altro-fornitore').val();
+                   
+                   let displayName = '';
+                   if (nome === 'ALTRO' && altroNome) {
+                       displayName = altroNome;
+                   } else if (nome && nome !== 'ALTRO') {
+                       displayName = nome;
+                   }
+                   
+                   if (displayName) {
+                       $(`.supplier-card[data-card-index="${sourceCardIndex}"] .transfer-dest`)
+                           .append(`<option value="F${cardIndex}">F${supplierNumber} - ${displayName}</option>`);
+                   } else {
                        $(`.supplier-card[data-card-index="${sourceCardIndex}"] .transfer-dest`)
                            .append(`<option value="F${cardIndex}">F${supplierNumber}</option>`);
                    }
                }
            });
            
-           // MODIFICATA: Aggiungi destinazioni con numerazione e numero fornitore di riferimento
+           // MODIFICATA: Aggiungi destinazioni con numerazione corretta
            $('.destination-card').each(function() {
                const cardIndex = $(this).data('card-index');
                const selectedSupplier = $(this).data('selected-supplier');
@@ -1548,7 +1612,7 @@ $(document).ready(function() {
            const certificazione = $(this).find('.certificazione').val() || 'N/D';
            const linea = $(this).find('.linea').val() || 'N/D';
            
-           if (nomeFornitore && supplierNumber) {
+           if (nomeFornitore) {
                fornitori.push({ 
                    cardIndex: cardIndex,
                    supplierNumber: supplierNumber,
@@ -1646,7 +1710,7 @@ $(document).ready(function() {
            }
            transferData[targetCardIndex].push({
                fromCard: sourceCardIndex,
-               fromSupplier: sourceSupplierNumber,
+               fromSupplierNumber: sourceSupplierNumber,
                fromName: sourceName,
                amount: transferAmount,
                timestamp: new Date().toLocaleTimeString('it-IT')
@@ -1728,7 +1792,6 @@ $(document).ready(function() {
        return 'Destinazione';
    }
 
-   // MODIFICATA: Aggiorna dettagli trasferimento con numero fornitore
    function updateTransferDetails(targetCard, sourceSupplierNumber, sourceName, amount) {
        const detailsContainer = targetCard.find('.transfer-details');
        detailsContainer.removeClass('hidden-field');
@@ -1750,6 +1813,7 @@ $(document).ready(function() {
        return $(`.supplier-card[data-card-index="${maxIndex}"]`);
    }
 
+   // MODIFICATA: Applica combinazione con numero fornitore
    function applyCombination(color) {
        const selectedCombo = $(`#combinazione-fornitori-${color}`).val();
        if (!selectedCombo) {
@@ -1780,10 +1844,10 @@ $(document).ready(function() {
            const linea = card.find('.linea').val() || 'N/D';
            
            const quantitaTrasformata = parseFloat(card.find('.quantita-trasformata').val()) || 0;
-           const resa = fornitoriData[cardIndex]?.resa || 30;
+           const rese = fornitoriData[cardIndex]?.resa || { prima: 30 };
            
            if (quantitaTrasformata > 0) {
-               const risultatoFornitore = (quantitaTrasformata * resa / 100);
+               const risultatoFornitore = (quantitaTrasformata * rese.prima / 100);
                
                combinationDetails.push({
                    nome: nomeFornitore,
@@ -1791,7 +1855,7 @@ $(document).ready(function() {
                    certificazione: certificazione,
                    linea: linea,
                    quantita: quantitaTrasformata,
-                   resa: resa,
+                   resa: rese.prima,
                    risultato: risultatoFornitore.toFixed(1),
                    cardIndex: parseInt(cardIndex)
                });
@@ -1802,22 +1866,18 @@ $(document).ready(function() {
        if (lastCardInCombo.length > 0) {
            const lastCardIndex = lastCardInCombo.data('card-index');
            
-           // Trova la quantità del fornitore finale nella combinazione
-           const lastCardDetail = combinationDetails.find(d => d.cardIndex === lastCardIndex);
-           const lastCardQty = lastCardDetail ? parseFloat(lastCardDetail.risultato) : 0;
-           
            // Calcola il totale della combinazione
            const totalCombination = combinationDetails.reduce((sum, detail) => 
                sum + parseFloat(detail.risultato), 0);
            
            const quantitaPrimaField = lastCardInCombo.find('.succo-prima');
            
-           // Mostra solo la quantità del fornitore finale
-           quantitaPrimaField.val(lastCardQty.toFixed(1));
+           // Mostra il totale della combinazione
+           quantitaPrimaField.val(totalCombination.toFixed(1));
            quantitaPrimaField.addClass('combination-result');
            quantitaPrimaField.attr('data-combination-type', color);
            
-           // Crea i dettagli della combinazione con numero fornitore
+           // Crea i dettagli della combinazione
            const combinationText = combinationDetails.map(detail => 
                `F${detail.supplierNumber}= ${detail.risultato}kg`
            ).join(' + ');
@@ -1851,7 +1911,7 @@ $(document).ready(function() {
            updateDestinationCard(lastCardIndex);
            
            const colorText = color.charAt(0).toUpperCase() + color.slice(1);
-           alert(`Combinazione ${colorText} applicata!\n\nDettaglio:\n${combinationDetails.map(d => `F${d.supplierNumber} - ${d.nome}: ${d.quantita}kg × ${d.resa}% = ${d.risultato}kg`).join('\n')}\n\nTotale combinazione: ${totalCombination.toFixed(1)} kg\nQuantità F${lastCardDetail.supplierNumber}: ${lastCardQty.toFixed(1)} kg`);
+           alert(`Combinazione ${colorText} applicata!\n\nDettaglio:\n${combinationDetails.map(d => `F${d.supplierNumber} - ${d.nome}: ${d.quantita}kg × ${d.resa}% = ${d.risultato}kg`).join('\n')}\n\nTotale combinazione: ${totalCombination.toFixed(1)} kg`);
        }
    }
 
@@ -1894,7 +1954,7 @@ $(document).ready(function() {
        alert(`Combinazione ${colorText} rimossa. I valori sono stati ricalcolati.`);
    }
 
-   // Reset card
+   // MODIFICATA: Reset card
    window.resetCard = function(cardIndex) {
        if (confirm('Resettare tutti i campi di questa card?')) {
            const supplierCard = $(`.supplier-card[data-card-index="${cardIndex}"]`);
@@ -1925,6 +1985,9 @@ $(document).ready(function() {
                supplierCard.find('.succo-prima').removeClass('combination-result received-transfer');
                supplierCard.find('.transfer-details, .combination-details').addClass('hidden-field').html('');
                supplierCard.find('.card-header').text(`F${supplierNumber}`);
+               
+               // Nascondi sezione succo 2ª
+               supplierCard.find('.seconda-section').addClass('hidden-field');
                
                // Rimuovi dati trasferimenti
                delete transferData[cardIndex];
@@ -1958,7 +2021,7 @@ $(document).ready(function() {
        }
    };
 
-   // MODIFICATA: Rimuovi card con riorganizzazione posizioni e aggiornamento nextSupplierNumber
+   // MODIFICATA: Rimuovi card con riorganizzazione posizioni
    window.removeCard = function(cardIndex) {
        if (confirm('Rimuovere questa card?')) {
            // Rimuovi riferimenti dalle combinazioni
@@ -1986,11 +2049,8 @@ $(document).ready(function() {
                );
            });
            
-           // Riorganizza le posizioni dopo la rimozione
+           // NUOVA: Riorganizza le posizioni dopo la rimozione
            reorganizePositions();
-           
-           // Aggiorna nextSupplierNumber basandosi sui fornitori rimanenti
-           updateNextSupplierNumber();
            
            updateTotals();
            updateCombinazioneOptions();
@@ -2000,13 +2060,12 @@ $(document).ready(function() {
        }
    };
 
-   // Salvataggio e caricamento file
+   // Salvataggio e caricamento file (mantenuto uguale per brevità - include già tutti i dati necessari)
    function collectProgramData() {
        const data = {
            tipoAgrume: $('#tipo-agrume').val(),
            dataLavorazione: $('#data-lavorazione').val(),
            ultimaRevisione: $('#last-revision').text(),
-           nextSupplierNumber: nextSupplierNumber, // NUOVO: Salva il numero progressivo
            transferData: transferData,
            transferredAmounts: transferredAmounts,
            provenienzaData: provenienzaData,
@@ -2019,7 +2078,7 @@ $(document).ready(function() {
        // Raccolta dati fornitori
        $('.supplier-card').each(function() {
            const cardIndex = $(this).data('card-index');
-           const supplierNumber = $(this).data('supplier-number'); // NUOVO: Salva numero fornitore
+           const supplierNumber = $(this).data('supplier-number');
            const receivedTransfers = transferData[cardIndex] || [];
            
            // Determina colore combinazione
@@ -2033,7 +2092,7 @@ $(document).ready(function() {
            const card = {
                cardIndex: cardIndex,
                cardType: 'supplier',
-               supplierNumber: supplierNumber, // NUOVO
+               supplierNumber: supplierNumber,
                nome: $(this).find('.nome-fornitore').val(),
                altroNome: $(this).find('.altro-fornitore').val(),
                quantitaEntrata: parseFloat($(this).find('.quantita-entrata').val()) || 0,
@@ -2048,6 +2107,8 @@ $(document).ready(function() {
                orarioInizio: $(this).find('.orario-inizio').val(),
                orarioFine: $(this).find('.orario-fine').val(),
                succo: parseFloat($(this).find('.succo-prima').val()) || 0,
+               succoSeconda: parseFloat($(this).find('.succo-seconda').val()) || 0,
+               succoTorchiato: parseFloat($(this).find('.succo-torchiato').val()) || 0,
                destinazione: $(this).find('.destinazione-prima').val(),
                altraDestinazione: $(this).find('.altra-destinazione').val(),
                hasCombination: $(this).find('.succo-prima').hasClass('combination-result'),
@@ -2177,15 +2238,11 @@ $(document).ready(function() {
        $(this).val('');
    });
 
-   // MODIFICATA: Caricamento dati con ripristino del numero progressivo dei fornitori
    function loadDataFromObject(data) {
        // Ripristina dati base
        $('#tipo-agrume').val(data.tipoAgrume || '');
        $('#data-lavorazione').val(data.dataLavorazione || '');
        $('#selected-agrume').text(data.tipoAgrume || 'N/D');
-       
-       // NUOVO: Ripristina il numero progressivo dei fornitori
-       nextSupplierNumber = data.nextSupplierNumber || 1;
        
        // Ripristina dati globali
        transferData = data.transferData || {};
@@ -2208,7 +2265,7 @@ $(document).ready(function() {
                const position = index + 1; // Posizione sequenziale
                
                if (cardData.cardType === 'supplier') {
-                   const supplierNumber = cardData.supplierNumber || cardIndex; // Fallback al cardIndex se manca
+                   const supplierNumber = cardData.supplierNumber || cardIndex;
                    const newCard = createSupplierCard(cardIndex, supplierNumber);
                    $('#main-grid').append(newCard);
                    
@@ -2230,8 +2287,15 @@ $(document).ready(function() {
                    card.find('.orario-inizio').val(cardData.orarioInizio || '');
                    card.find('.orario-fine').val(cardData.orarioFine || '');
                    card.find('.succo-prima').val(cardData.succo || '');
+                   card.find('.succo-seconda').val(cardData.succoSeconda || '');
+                   card.find('.succo-torchiato').val(cardData.succoTorchiato || '');
                    card.find('.destinazione-prima').val(cardData.destinazione || '');
                    card.find('.altra-destinazione').val(cardData.altraDestinazione || '');
+                   
+                   // Gestisci sezione succo 2ª
+                   if (cardData.linea === 'BOE/1100') {
+                       card.find('.seconda-section').removeClass('hidden-field');
+                   }
                    
                    // Gestisci campi altro
                    if (cardData.nome === 'ALTRO') {
@@ -2394,7 +2458,6 @@ $(document).ready(function() {
        updateTotals();
    });
 
-   // MODIFICATA: Aggiungi fornitore con numero progressivo
    $('#aggiungi-fornitore').click(function() {
        if (!$('#tipo-agrume').val()) {
            alert('Seleziona prima il tipo di agrume');
@@ -2405,7 +2468,7 @@ $(document).ready(function() {
        if (position === null) return;
        
        const cardIndex = getNextCardIndex();
-       const supplierNumber = getNextSupplierNumber(); // NUOVO: Usa numero progressivo
+       const supplierNumber = getNextSupplierNumber();
        const newCard = createSupplierCard(cardIndex, supplierNumber);
        $('#main-grid').append(newCard);
        
@@ -2419,7 +2482,7 @@ $(document).ready(function() {
        updateDestinationHeaders();
    });
 
-   // Gestione aggiunta destinazione con selezione fornitore
+   // MODIFICATA: Gestione aggiunta destinazione con selezione fornitore
    $('#aggiungi-destinazione').click(async function() {
        try {
            const position = getNextAvailablePosition();
@@ -2545,8 +2608,8 @@ $(document).ready(function() {
        $(this).select();
    });
 
-   // Validazione campi numerici
-   $(document).on('input', 'input[type="number"]', function() {
+   // Validazione campi numerici rimossa per permettere qualsiasi valore nella portata
+   $(document).on('input', 'input[type="number"]:not(.portata)', function() {
        const value = parseFloat($(this).val());
        const min = parseFloat($(this).attr('min'));
        const max = parseFloat($(this).attr('max'));
@@ -2697,7 +2760,6 @@ $(document).ready(function() {
        console.log('Transfer Data:', transferData);
        console.log('Combination Data:', combinationData);
        console.log('Provenienza Data:', provenienzaData);
-       console.log('Next Supplier Number:', nextSupplierNumber);
    };
 
    // Controllo responsive per mobile
@@ -2718,13 +2780,15 @@ $(document).ready(function() {
        checkMobileView();
    });
 
-   console.log('Sistema Programma Giornaliero Trasformazione inizializzato - Layout 4x2 FINALE');
-   console.log('Modifiche finali applicate:');
-   console.log('- Numerazione progressiva fornitori (F1, F2, F3, ecc.)');
-   console.log('- Menu trasferimenti con numero fornitore specifico');
+   console.log('Sistema Programma Giornaliero Trasformazione inizializzato - Layout 4x2 COMPLETO');
+   console.log('Modifiche implementate:');
+   console.log('- Numerazione fornitori progressiva e indipendente dalle posizioni');
+   console.log('- Numero fornitore specificato nel menu trasferimenti');
+   console.log('- Rimanente mostra totale combinazione quando applicata');
+   console.log('- Ripristinate funzioni calcolo succo 2ª e torchiato');
+   console.log('- Portata senza limitazioni numeriche');
    console.log('- Riorganizzazione automatica posizioni dopo rimozione');
    console.log('- Selezione fornitore per nuove destinazioni');
-   console.log('- Persistenza numerazione fornitori nel salvataggio/caricamento');
    console.log('Tasti scorciatoia: Ctrl+S (Salva), Ctrl+O (Apri), Ctrl+P (Stampa), Ctrl+N (Nuovo Fornitore), Ctrl+M (Nuova Destinazione)');
 });
 </script>
